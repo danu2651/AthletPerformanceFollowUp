@@ -1,5 +1,4 @@
-const Session = require("../models/sessionModel");
-const db = require("../config/db");
+const SessionService = require("../services/sessionService");
 
 /**
  * @desc Record session + splits (SRS 3.2 & 3.3)
@@ -12,13 +11,15 @@ exports.createSession = async (req, res, next) => {
     const dist = parseFloat(distance_km);
     const timeInHours = parseInt(duration_seconds) / 3600;
 
-    const avg_speed = dist > 0 && timeInHours > 0 
-      ? parseFloat((dist / timeInHours).toFixed(2)) 
-      : 0;
+    const avg_speed =
+      dist > 0 && timeInHours > 0
+        ? parseFloat((dist / timeInHours).toFixed(2))
+        : 0;
 
-    const avg_pace = dist > 0 
-      ? parseFloat((parseInt(duration_seconds) / 60 / dist).toFixed(2)) 
-      : 0;
+    const avg_pace =
+      dist > 0
+        ? parseFloat((parseInt(duration_seconds) / 60 / dist).toFixed(2))
+        : 0;
 
     const session = await Session.createWithSplits(
       {
@@ -27,7 +28,7 @@ exports.createSession = async (req, res, next) => {
         avg_speed,
         avg_pace,
       },
-      splits || []
+      splits || [],
     );
 
     res.status(201).json({
@@ -90,11 +91,11 @@ exports.getUserSessions = async (req, res, next) => {
     const userId = req.userData?.userId || req.userData?.id;
     const query = `SELECT * FROM training_sessions WHERE user_id = $1 ORDER BY training_date DESC`;
     const result = await db.query(query, [userId]);
-    
+
     res.status(200).json({
       status: "success",
       results: result.rows.length,
-      data: result.rows
+      data: result.rows,
     });
   } catch (error) {
     next(error);
@@ -112,19 +113,143 @@ exports.deleteSession = async (req, res, next) => {
 
     const result = await db.query(
       "DELETE FROM training_sessions WHERE id = $1 AND user_id = $2 RETURNING *",
-      [id, userId]
+      [id, userId],
     );
 
     if (result.rowCount === 0) {
-      return res.status(404).json({ status: "error", message: "Session not found" });
+      return res
+        .status(404)
+        .json({ status: "error", message: "Session not found" });
     }
 
     res.status(200).json({
       status: "success",
-      message: "Session deleted successfully"
+      message: "Session deleted successfully",
     });
   } catch (error) {
     console.error("Delete Error:", error);
     next(error);
   }
 };
+
+const sessionController = {
+  // ── CRUD ──────────────────────────────────────
+  getAll: async (req, res, next) => {
+    try {
+      const { total, rows } = await SessionService.getAllSessions(
+        req.user.id,
+        req.query,
+      );
+      const page = parseInt(req.query.page || 1);
+      const limit = Math.min(100, parseInt(req.query.limit || 10));
+      res.json({
+        success: true,
+        pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+        data: rows,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getOne: async (req, res, next) => {
+    try {
+      const session = await SessionService.getSession(
+        req.params.id,
+        req.user.id,
+      );
+      res.json({ success: true, data: session });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  create: async (req, res, next) => {
+    try {
+      const session = await SessionService.createSession(req.user.id, req.body);
+      res.status(201).json({
+        success: true,
+        message: "Training session recorded",
+        data: session,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  update: async (req, res, next) => {
+    try {
+      const session = await SessionService.updateSession(
+        req.params.id,
+        req.user.id,
+        req.body,
+      );
+      res.json({ success: true, message: "Session updated", data: session });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  delete: async (req, res, next) => {
+    try {
+      await SessionService.deleteSession(req.params.id, req.user.id);
+      res.json({ success: true, message: "Session deleted" });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // ── Analytics ─────────────────────────────────
+  getSummary: async (req, res, next) => {
+    try {
+      const data = await SessionService.getSummary(req.user.id);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getTrends: async (req, res, next) => {
+    try {
+      const { period = "daily", limit = 30 } = req.query;
+      const data = await SessionService.getTrends(
+        req.user.id,
+        period,
+        parseInt(limit),
+      );
+      res.json({ success: true, data: { period, ...data } });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getWeekly: async (req, res, next) => {
+    try {
+      const limit = Math.min(52, parseInt(req.query.limit || 12));
+      const data = await SessionService.getWeeklySummaries(req.user.id, limit);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getBest: async (req, res, next) => {
+    try {
+      const data = await SessionService.getBest(req.user.id);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getComparison: async (req, res, next) => {
+    try {
+      const data = await SessionService.getComparison(req.user.id);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+};
+
+module.exports = sessionController;

@@ -1,64 +1,65 @@
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const User = require("../models/userModel");
+const bcrypt = require('bcryptjs');
+const jwt    = require('jsonwebtoken');
+const UserModel = require('../models/userModel');
 
-/**
- * Register a new athlete
- */
-const register = async (name, email, password) => {
-  try {
-    // 1. Hash the password before saving to DB
-    const hashedPassword = await bcrypt.hash(password, 10);
+const AuthService = {
+  signToken: (id, role) =>
+    jwt.sign({ id, role }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    }),
 
-    // 2. Pass to the model (Maps to your password_hash column)
-    const newUser = await User.create(name, email, hashedPassword);
+  register: async ({ name, email, password, fullName, gender, birthDate, heightCm, weightKg, preferredUnit }) => {
+    const existing = await UserModel.findByEmail(email);
+    if (existing) {
+      const err = new Error('Email already registered');
+      err.statusCode = 409;
+      throw err;
+    }
 
-    return newUser;
-  } catch (error) {
-    // Log the error here so you can see it in your VS Code terminal
-    console.error("Service Layer Error (Register):", error);
-    throw error;
-  }
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await UserModel.create({
+      name, email, passwordHash,
+      fullName, gender, birthDate,
+      heightCm, weightKg, preferredUnit,
+    });
+
+    const token = AuthService.signToken(user.id, user.role);
+    return { user, token };
+  },
+
+  login: async (email, password) => {
+    const user = await UserModel.findByEmail(email);
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+      const err = new Error('Invalid email or password');
+      err.statusCode = 401;
+      throw err;
+    }
+    if (!user.is_active) {
+      const err = new Error('Account is disabled');
+      err.statusCode = 403;
+      throw err;
+    }
+
+    await UserModel.audit(user.id, 'LOGIN', 'users', user.id);
+    const token = AuthService.signToken(user.id, user.role);
+    return { user, token };
+  },
+
+  changePassword: async (userId, currentPassword, newPassword) => {
+    // Need the hash — re-fetch with password
+    const { query } = require('../config/db');
+    const res = await query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+    const { password_hash } = res.rows[0];
+
+    if (!(await bcrypt.compare(currentPassword, password_hash))) {
+      const err = new Error('Current password is incorrect');
+      err.statusCode = 401;
+      throw err;
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 12);
+    await UserModel.updatePassword(userId, newHash);
+  },
 };
 
-/**
- * Login an athlete
- */
-const login = async (email, password) => {
-  try {
-    // 1. Find the user by email
-    const user = await User.findByEmail(email);
-    if (!user) throw new Error("User not found");
-
-    // 2. Compare incoming password with stored password_hash
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) throw new Error("Invalid credentials");
-
-    // 3. Generate JWT Token
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET || "supersecretkey",
-      { expiresIn: "24h" },
-    );
-
-    // 4. Return user data (without password) and token
-    return {
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-      token,
-    };
-  } catch (error) {
-    console.error("Service Layer Error (Login):", error);
-    throw error;
-  }
-};
-
-// EXPORT BOTH FUNCTIONS CORRECTLY
-module.exports = {
-  register,
-  login,
-};
+module.exports = AuthService;

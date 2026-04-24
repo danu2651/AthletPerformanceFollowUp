@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Activity, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 
-// FIX: Changed from '@/lib/axios' to a relative path based on your folder image
+
 import api from "../../../lib/axios";
 
 export default function LoginPage() {
@@ -22,70 +22,68 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // Connects to your Node.js backend
+      // 1. Send request to backend
       const res = await api.post("/auth/login", { email, password });
 
-      // Save the JWT token
-      localStorage.setItem("token", res.data.token);
+      // 2. Check if the backend returned success
+      if (res.data.success && res.data.token) {
+        // PROFESSIONAL TIP: Always use 'athlete_token' to avoid conflicts
+        localStorage.setItem("athlete_token", res.data.token);
+        localStorage.setItem("user_data", JSON.stringify(res.data.user));
 
-      // Send the athlete to the dashboard
-      router.push("/dashboard");
+        // 3. Navigate to dashboard
+        router.push("/dashboard");
+      } else {
+        setError(res.data.message || "Login failed.");
+      }
     } catch (err: any) {
-      console.error("Login Error:", err);
-      setError(
-        err.response?.data?.message || "Invalid credentials. Please try again.",
-      );
+      console.error("Frontend Login Error:", err);
+      // Captures the message sent by our fixed controller
+      const message =
+        err.response?.data?.message || "Connection to server failed.";
+      setError(message);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background relative overflow-hidden px-4">
-      {/* Background Glows */}
-      <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-primary/20 blur-[120px] rounded-full animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] bg-primary/10 blur-[120px] rounded-full" />
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] relative overflow-hidden px-4">
+      {/* Visual background elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-[#FC4C02]/10 blur-[120px] rounded-full" />
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 10 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full max-w-md px-8 py-12 glass-card relative z-10 border border-white/10 shadow-2xl"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md px-8 py-10 bg-[#141414] border border-white/5 rounded-3xl relative z-10 shadow-2xl"
       >
         <div className="flex flex-col items-center mb-10">
-          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4 border border-primary/20 shadow-glow">
-            <Activity className="text-primary w-8 h-8" />
+          <div className="w-16 h-16 bg-[#FC4C02]/10 rounded-2xl flex items-center justify-center mb-4 border border-[#FC4C02]/20">
+            <Activity className="text-[#FC4C02] w-8 h-8" />
           </div>
-          <h2 className="text-3xl font-black tracking-tighter uppercase italic text-white text-center">
+          <h2 className="text-3xl font-black tracking-tighter uppercase italic text-white italic">
             Athlete Login
           </h2>
-          <p className="text-gray-500 text-sm mt-1 uppercase tracking-widest font-medium">
-            Access your stats
-          </p>
         </div>
 
         {error && (
-          <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="bg-red-500/10 border border-red-500/50 text-red-500 text-[10px] py-3 px-4 rounded-xl mb-6 text-center font-bold uppercase"
-          >
+          <div className="bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] py-3 px-4 rounded-xl mb-6 text-center font-black uppercase tracking-widest">
             {error}
-          </motion.div>
+          </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-2">
             <label className="text-[10px] uppercase tracking-[0.2em] font-black text-gray-500 ml-1">
-              Email
+              Email Address
             </label>
-            <div className="relative group">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-primary transition-colors" />
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all text-sm text-white placeholder:text-gray-800"
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 outline-none focus:border-[#FC4C02]/50 text-white transition-all"
                 placeholder="athlete@example.com"
                 required
               />
@@ -96,13 +94,13 @@ export default function LoginPage() {
             <label className="text-[10px] uppercase tracking-[0.2em] font-black text-gray-500 ml-1">
               Password
             </label>
-            <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500 group-focus-within:text-primary transition-colors" />
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-600" />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all text-sm text-white placeholder:text-gray-800"
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-4 pl-12 pr-4 outline-none focus:border-[#FC4C02]/50 text-white transition-all"
                 placeholder="••••••••"
                 required
               />
@@ -111,17 +109,13 @@ export default function LoginPage() {
 
           <button
             disabled={isLoading}
-            className="w-full bg-primary text-black font-black py-4 rounded-xl flex items-center justify-center gap-2 hover:shadow-glow-strong transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed group uppercase italic tracking-tighter"
+            className="w-full bg-[#FC4C02] hover:bg-[#e34402] text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-all transform active:scale-95 disabled:opacity-50 uppercase italic tracking-tight"
           >
             {isLoading ? (
-              <Loader2 className="animate-spin" size={20} />
+              <Loader2 className="animate-spin" />
             ) : (
               <>
-                Enter Dashboard
-                <ArrowRight
-                  size={18}
-                  className="group-hover:translate-x-1 transition-transform"
-                />
+                Enter Dashboard <ArrowRight size={18} />
               </>
             )}
           </button>
@@ -129,12 +123,9 @@ export default function LoginPage() {
 
         <div className="text-center mt-8">
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
-            New to APTS?
-            <Link
-              href="/register"
-              className="text-primary ml-2 hover:underline"
-            >
-              Create Profile
+            New Athlete?{" "}
+            <Link href="/register" className="text-[#FC4C02] ml-1">
+              Create Account
             </Link>
           </p>
         </div>
