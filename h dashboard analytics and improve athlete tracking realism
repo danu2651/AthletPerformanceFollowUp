@@ -1,0 +1,5 @@
+[33m72d7fd2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m fix: normalize file naming to lowercase
+[33m7f31108[m fix: remove node_modules and clean project structure
+[33md42d168[m cleaning up
+[33m9a6d298[m  fixing the sessioncontroller.js and  the sessionroutes.js
+[33mc7470e1[m  ongoing project
